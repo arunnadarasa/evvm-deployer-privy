@@ -26,13 +26,13 @@ export async function createKernelClientsForChain(
 
   const entryPoint = getEntryPoint("0.7");
 
-  const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
-    signer,
+  const ecdsaValidator = await signerToEcdsaValidator(publicClient as any, {
+    signer: signer as any,
     entryPoint,
     kernelVersion: KERNEL_V3_1,
   });
 
-  const account = await createKernelAccount(publicClient, {
+  const account = await createKernelAccount(publicClient as any, {
     plugins: { sudo: ecdsaValidator },
     entryPoint,
     kernelVersion: KERNEL_V3_1,
