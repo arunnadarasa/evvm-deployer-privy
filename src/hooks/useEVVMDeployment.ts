@@ -1,7 +1,15 @@
 import { useState, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { createPublicClient, createWalletClient, custom, http, type Chain } from 'viem';
+import {
+  createPublicClient,
+  createWalletClient,
+  custom,
+  http,
+  type Chain,
+  type PublicClient,
+  type WalletClient,
+} from 'viem';
 import { baseSepolia, sepolia } from 'wagmi/chains';
 import {
   deployEVVMContracts,
@@ -47,10 +55,10 @@ export function useEVVMDeployment() {
 
   const deploy = useCallback(
     async (config: DeploymentConfig): Promise<DeploymentRecord | null> => {
-      let activeWalletClient = walletClient;
+      let activeWalletClient = walletClient as WalletClient | undefined;
       let activeChain = resolveSupportedChain(chain?.id ?? walletClient?.chain?.id ?? publicClient?.chain?.id);
       let activePublicClient =
-        publicClient ??
+        (publicClient as PublicClient | undefined) ??
         (activeChain
           ? createPublicClient({
               chain: activeChain,
