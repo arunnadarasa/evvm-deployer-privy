@@ -96,13 +96,13 @@ export function ZeroDevKernelProvider({ children }: { children: ReactNode }) {
 
         const [bBase, bSep] = await Promise.all([
           createKernelClientsForChain(
-            provider,
+            provider as any,
             baseSepolia,
             baseRpc.bundler,
             baseRpc.paymaster,
           ),
           createKernelClientsForChain(
-            provider,
+            provider as any,
             sepolia,
             sepRpc.bundler,
             sepRpc.paymaster,
