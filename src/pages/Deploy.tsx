@@ -30,10 +30,14 @@ type Phase = 'configure' | 'deploy' | 'complete';
 export default function Deploy() {
   const { address, isConnected, chain } = useAccount();
   const { login, authenticated } = usePrivy();
+  const { wallets } = useWallets();
   const { deploying, progress, error, deploy } = useEVVMDeployment();
   const [phase, setPhase] = useState<Phase>('configure');
   const [completedDeployment, setCompletedDeployment] = useState<DeploymentRecord | null>(null);
   const bytesReady = hasBytecodes();
+
+  // Resolve address: prefer wagmi, fall back to Privy embedded wallet
+  const resolvedAddress = address ?? wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined;
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
@@ -45,10 +49,10 @@ export default function Deploy() {
 
   // Auto-fill connected address
   const fillAddress = () => {
-    if (address) {
-      if (!adminAddr) setAdminAddr(address);
-      if (!goldenFisher) setGoldenFisher(address);
-      if (!activator) setActivator(address);
+    if (resolvedAddress) {
+      if (!adminAddr) setAdminAddr(resolvedAddress);
+      if (!goldenFisher) setGoldenFisher(resolvedAddress);
+      if (!activator) setActivator(resolvedAddress);
     }
   };
 
