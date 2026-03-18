@@ -202,7 +202,7 @@ export default function Deploy() {
                       <Input
                         value={activator}
                         onChange={(e) => setActivator(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
