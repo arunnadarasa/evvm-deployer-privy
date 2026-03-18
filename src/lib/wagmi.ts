@@ -1,5 +1,6 @@
-import { createConfig, http } from 'wagmi';
-import { baseSepolia, sepolia } from 'wagmi/chains';
+import { http } from "wagmi";
+import { createConfig } from "@privy-io/wagmi";
+import { baseSepolia, sepolia } from "wagmi/chains";
 
 export const config = createConfig({
   chains: [baseSepolia, sepolia],
@@ -8,6 +9,12 @@ export const config = createConfig({
     [sepolia.id]: http(),
   },
 });
+
+declare module "wagmi" {
+  interface Register {
+    config: typeof config;
+  }
+}
 
 export const SUPPORTED_CHAINS = {
   BASE_SEPOLIA: baseSepolia,
