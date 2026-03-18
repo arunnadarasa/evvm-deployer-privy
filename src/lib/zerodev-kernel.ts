@@ -47,7 +47,7 @@ export async function createKernelClientsForChain(
     account,
     chain,
     bundlerTransport: http(bundlerRpc),
-    client: publicClient,
+    client: publicClient as any,
     paymaster: {
       getPaymasterData: (userOperation: any) =>
         paymasterClient.sponsorUserOperation({ userOperation }),

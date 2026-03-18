@@ -144,12 +144,12 @@ export function ZeroDevKernelProvider({ children }: { children: ReactNode }) {
     if (!bundleBase) return null;
     setSponsoring(true);
     try {
-      const userOpHash = await bundleBase.kernelClient.sendUserOperation({
+      const userOpHash = await (bundleBase.kernelClient as any).sendUserOperation({
         callData: await bundleBase.account.encodeCalls([
           { to: zeroAddress, value: 0n, data: "0x" },
         ]),
       });
-      await bundleBase.kernelClient.waitForUserOperationReceipt({ hash: userOpHash });
+      await (bundleBase.kernelClient as any).waitForUserOperationReceipt({ hash: userOpHash });
       return userOpHash;
     } finally {
       setSponsoring(false);

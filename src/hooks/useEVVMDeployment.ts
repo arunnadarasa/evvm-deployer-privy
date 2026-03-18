@@ -59,8 +59,8 @@ export function useEVVMDeployment() {
       try {
         const addresses: ContractAddresses = await deployEVVMContracts(
           config,
-          walletClient,
-          publicClient,
+          walletClient as any,
+          publicClient as any,
           (p) => {
             setProgress(p);
             record.currentStep = p.step;
