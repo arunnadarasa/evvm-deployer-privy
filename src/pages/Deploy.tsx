@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +30,7 @@ type Phase = 'configure' | 'deploy' | 'complete';
 
 export default function Deploy() {
   const { address, isConnected, chain } = useAccount();
-  const { login, authenticated } = usePrivy();
+  const { login, authenticated, user } = usePrivy();
   const { wallets } = useWallets();
   const { deploying, progress, error, deploy } = useEVVMDeployment();
   const [phase, setPhase] = useState<Phase>('configure');
@@ -37,7 +38,10 @@ export default function Deploy() {
   const bytesReady = hasBytecodes();
 
   // Resolve address: prefer wagmi, fall back to Privy embedded wallet
-  const resolvedAddress = address ?? wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined;
+  const resolvedAddress =
+    address ??
+    (wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined) ??
+    (user?.wallet?.address as `0x${string}` | undefined);
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
@@ -50,9 +54,11 @@ export default function Deploy() {
   // Auto-fill connected address
   const fillAddress = () => {
     if (resolvedAddress) {
-      if (!adminAddr) setAdminAddr(resolvedAddress);
-      if (!goldenFisher) setGoldenFisher(resolvedAddress);
-      if (!activator) setActivator(resolvedAddress);
+      setAdminAddr(resolvedAddress);
+      setGoldenFisher(resolvedAddress);
+      setActivator(resolvedAddress);
+    } else {
+      toast({ title: 'Wallet not ready', description: 'Your wallet is still loading. Please try again in a moment.', variant: 'destructive' });
     }
   };
 
