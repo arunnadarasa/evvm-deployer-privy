@@ -56,17 +56,18 @@ export function useEVVMDeployment() {
   const deploy = useCallback(
     async (config: DeploymentConfig): Promise<DeploymentRecord | null> => {
       let activeWalletClient = walletClient as WalletClient | undefined;
-      let activeChain = resolveSupportedChain(chain?.id ?? walletClient?.chain?.id ?? publicClient?.chain?.id);
+      let activeChain =
+        resolveSupportedChain(chain?.id ?? walletClient?.chain?.id ?? publicClient?.chain?.id) ??
+        baseSepolia;
       let activePublicClient =
         (publicClient as PublicClient | undefined) ??
-        (activeChain
-          ? createPublicClient({
-              chain: activeChain,
-              transport: http(activeChain.rpcUrls.default.http[0]),
-            })
-          : undefined);
+        createPublicClient({
+          chain: activeChain,
+          transport: http(activeChain.rpcUrls.default.http[0]),
+        });
 
-      if ((!activeWalletClient || !activeChain) && embeddedWallet && resolvedAddress) {
+      if (embeddedWallet && resolvedAddress) {
+        await embeddedWallet.switchChain(activeChain.id);
         const provider = await embeddedWallet.getEthereumProvider();
 
         if (!activeChain) {
@@ -75,7 +76,7 @@ export function useEVVMDeployment() {
             typeof providerChainId === 'string'
               ? Number.parseInt(providerChainId, 16)
               : Number(providerChainId);
-          activeChain = resolveSupportedChain(parsedChainId);
+          activeChain = resolveSupportedChain(parsedChainId) ?? baseSepolia;
         }
 
         if (activeChain && !activePublicClient) {
