@@ -184,7 +184,7 @@ export default function Deploy() {
                       <Input
                         value={adminAddr}
                         onChange={(e) => setAdminAddr(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
