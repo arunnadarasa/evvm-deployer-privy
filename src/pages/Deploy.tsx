@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
