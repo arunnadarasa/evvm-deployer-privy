@@ -43,7 +43,6 @@ function generateRandomNonce(): string {
 }
 
 export default function Signatures() {
-  const { login } = usePrivy();
   const { isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -257,15 +256,17 @@ export default function Signatures() {
     setSigning(false);
   };
 
-  if (!isConnected) {
+  const { login, authenticated } = usePrivy();
+
+  if (!authenticated) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <PenTool className="h-8 w-8 text-primary mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Log in to Sign</h1>
+        <h1 className="text-xl font-bold mb-2">Login to Sign</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Sign in with Privy to generate EIP-191 signatures for EVVM operations.
+          Login to generate EIP-191 signatures for EVVM operations.
         </p>
-        <Button onClick={() => login()}>Log in</Button>
+        <Button onClick={login} className="glow-primary">Login</Button>
       </main>
     );
   }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { toast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,21 +29,19 @@ const DEPLOYMENT_STEPS = [
 type Phase = 'configure' | 'deploy' | 'complete';
 
 export default function Deploy() {
-  const { login } = usePrivy();
   const { address, isConnected, chain } = useAccount();
-  const {
-    deploying,
-    progress,
-    error,
-    deploy,
-    canDeploy,
-    kernelDeployReady,
-    kernelSepoliaError,
-    kernelError,
-  } = useEVVMDeployment();
+  const { login, authenticated, user } = usePrivy();
+  const { wallets } = useWallets();
+  const { deploying, progress, error, deploy } = useEVVMDeployment();
   const [phase, setPhase] = useState<Phase>('configure');
   const [completedDeployment, setCompletedDeployment] = useState<DeploymentRecord | null>(null);
   const bytesReady = hasBytecodes();
+
+  // Resolve address: prefer wagmi, fall back to Privy embedded wallet
+  const resolvedAddress =
+    address ??
+    (wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined) ??
+    (user?.wallet?.address as `0x${string}` | undefined);
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
@@ -54,21 +53,23 @@ export default function Deploy() {
 
   // Auto-fill connected address
   const fillAddress = () => {
-    if (address) {
-      if (!adminAddr) setAdminAddr(address);
-      if (!goldenFisher) setGoldenFisher(address);
-      if (!activator) setActivator(address);
+    if (resolvedAddress) {
+      setAdminAddr(resolvedAddress);
+      setGoldenFisher(resolvedAddress);
+      setActivator(resolvedAddress);
+    } else {
+      toast({ title: 'Wallet not ready', description: 'Your wallet is still loading. Please try again in a moment.', variant: 'destructive' });
     }
   };
 
   const handleDeploy = async () => {
-    if (!address) return;
+    if (!resolvedAddress) return;
     setPhase('deploy');
 
     const result = await deploy({
-      adminAddress: (adminAddr || address) as `0x${string}`,
-      goldenFisherAddress: (goldenFisher || address) as `0x${string}`,
-      activatorAddress: (activator || address) as `0x${string}`,
+      adminAddress: (adminAddr || resolvedAddress) as `0x${string}`,
+      goldenFisherAddress: (goldenFisher || resolvedAddress) as `0x${string}`,
+      activatorAddress: (activator || resolvedAddress) as `0x${string}`,
       evvmName,
       principalTokenName: tokenName,
       principalTokenSymbol: tokenSymbol,
@@ -94,15 +95,15 @@ export default function Deploy() {
     return 'pending';
   };
 
-  if (!isConnected) {
+  if (!authenticated) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <Rocket className="h-8 w-8 text-primary mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Log in to Deploy</h1>
+        <h1 className="text-xl font-bold mb-2">Login to Deploy</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Sign in with Privy (email, Google, or wallet) to deploy on Base Sepolia.
+          Login to deploy EVVM contracts on Base Sepolia.
         </p>
-        <Button onClick={() => login()}>Log in</Button>
+        <Button onClick={login} className="glow-primary">Login</Button>
       </main>
     );
   }
@@ -116,19 +117,6 @@ export default function Deploy() {
         </div>
         {chain && <NetworkBadge chainId={chain.id} />}
       </div>
-
-      {isConnected && !kernelDeployReady && (kernelSepoliaError || kernelError) && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 mb-6 flex gap-3">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <p className="text-xs font-medium text-destructive">ZeroDev Kernel not ready</p>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              {kernelSepoliaError || kernelError} Enable <strong>Ethereum Sepolia</strong> and{' '}
-              <strong>Base Sepolia</strong> for your ZeroDev project, then refresh.
-            </p>
-          </div>
-        </div>
-      )}
 
       {!bytesReady && (
         <div className="rounded-md border border-warning/30 bg-warning/5 p-3 mb-6 flex gap-3">
@@ -202,7 +190,7 @@ export default function Deploy() {
                       <Input
                         value={adminAddr}
                         onChange={(e) => setAdminAddr(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
@@ -211,7 +199,7 @@ export default function Deploy() {
                       <Input
                         value={goldenFisher}
                         onChange={(e) => setGoldenFisher(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
@@ -220,7 +208,7 @@ export default function Deploy() {
                       <Input
                         value={activator}
                         onChange={(e) => setActivator(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
@@ -230,19 +218,17 @@ export default function Deploy() {
                 <div className="flex items-center gap-2 rounded-md bg-muted/50 border border-border p-2">
                   <Info className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <p className="text-[10px] text-muted-foreground">
-                    Contracts deploy via your <strong>ZeroDev smart account</strong> on Base Sepolia (sponsored
-                    UserOps). Registry registration uses a separate Kernel on <strong>Ethereum Sepolia</strong>{' '}
-                    (also sponsored). No ETH required in your EOA for gas if paymaster policies allow it.
+                    Deployment requires ETH on Base Sepolia for gas fees. Each contract deployment is a separate transaction.
                   </p>
                 </div>
 
                 <Button
                   onClick={handleDeploy}
-                  disabled={!evvmName || deploying || !bytesReady || !canDeploy}
+                  disabled={!evvmName || deploying || !bytesReady}
                   className="w-full h-9 text-sm glow-primary"
                 >
                   <Rocket className="h-3.5 w-3.5" />
-                  Deploy via ZeroDev (6 + registry)
+                  Deploy 6 Contracts + Register
                 </Button>
               </CardContent>
             </Card>

@@ -1,17 +1,11 @@
 import { createRoot } from "react-dom/client";
 import { Buffer } from "buffer";
-import App from "./App.tsx";
-import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
+import App from "./App";
 import "./index.css";
 
-// Some web3/auth deps (Privy / ZeroDev / viem ecosystem) still expect Node's Buffer global.
-// Attach a browser-safe polyfill once so downstream code can call Buffer.from(...) safely.
+// Some web3/auth deps still expect Node's global `Buffer`.
 if ((globalThis as any).Buffer === undefined) {
   (globalThis as any).Buffer = Buffer;
 }
 
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+createRoot(document.getElementById("root")!).render(<App />);

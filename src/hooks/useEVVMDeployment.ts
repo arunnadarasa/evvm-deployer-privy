@@ -1,7 +1,18 @@
 import { useState, useCallback } from 'react';
-import { useAccount } from 'wagmi';
+import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import {
-  deployEVVMContractsViaKernel,
+  createPublicClient,
+  createWalletClient,
+  custom,
+  http,
+  type Chain,
+  type PublicClient,
+  type WalletClient,
+} from 'viem';
+import { baseSepolia, sepolia } from 'wagmi/chains';
+import {
+  deployEVVMContracts,
   type DeploymentConfig,
   type DeploymentProgress,
   type ContractAddresses,
@@ -13,36 +24,78 @@ import {
   type DeploymentRecord,
 } from '@/lib/storage';
 import { getChainName } from '@/lib/wagmi';
-import { useZeroDevKernel } from '@/contexts/ZeroDevKernelContext';
-import { baseSepolia } from 'wagmi/chains';
+
+const SUPPORTED_DEPLOY_CHAINS: Record<number, Chain> = {
+  [baseSepolia.id]: baseSepolia,
+  [sepolia.id]: sepolia,
+};
+
+const resolveSupportedChain = (chainId?: number | null): Chain | null => {
+  if (!chainId) return null;
+  return SUPPORTED_DEPLOY_CHAINS[chainId] ?? null;
+};
 
 export function useEVVMDeployment() {
   const [deploying, setDeploying] = useState(false);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { address, isConnected } = useAccount();
-  const {
-    kernelBundleBase,
-    kernelBundleSepolia,
-    kernelDeployReady,
-    kernelError,
-    kernelSepoliaError,
-  } = useZeroDevKernel();
+  const { address, chain } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const publicClient = usePublicClient();
+  const { user } = usePrivy();
+  const { wallets } = useWallets();
 
-  const canDeploy =
-    !!isConnected &&
-    !!address &&
-    kernelDeployReady &&
-    hasBytecodes();
+  const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === 'privy');
+  const resolvedAddress =
+    address ??
+    (embeddedWallet?.address as `0x${string}` | undefined) ??
+    (user?.wallet?.address as `0x${string}` | undefined);
+
+  const canDeploy = !!resolvedAddress && hasBytecodes();
 
   const deploy = useCallback(
     async (config: DeploymentConfig): Promise<DeploymentRecord | null> => {
-      if (!kernelBundleBase || !kernelBundleSepolia) {
-        setError(
-          kernelSepoliaError ??
-            kernelError ??
-            'ZeroDev Kernel not ready on Base Sepolia and Ethereum Sepolia.'
-        );
+      let activeWalletClient = walletClient as WalletClient | undefined;
+      let activeChain = resolveSupportedChain(chain?.id ?? walletClient?.chain?.id ?? publicClient?.chain?.id);
+      let activePublicClient =
+        (publicClient as PublicClient | undefined) ??
+        (activeChain
+          ? createPublicClient({
+              chain: activeChain,
+              transport: http(activeChain.rpcUrls.default.http[0]),
+            })
+          : undefined);
+
+      if ((!activeWalletClient || !activeChain) && embeddedWallet && resolvedAddress) {
+        const provider = await embeddedWallet.getEthereumProvider();
+
+        if (!activeChain) {
+          const providerChainId = await provider.request({ method: 'eth_chainId' });
+          const parsedChainId =
+            typeof providerChainId === 'string'
+              ? Number.parseInt(providerChainId, 16)
+              : Number(providerChainId);
+          activeChain = resolveSupportedChain(parsedChainId);
+        }
+
+        if (activeChain && !activePublicClient) {
+          activePublicClient = createPublicClient({
+            chain: activeChain,
+            transport: http(activeChain.rpcUrls.default.http[0]),
+          });
+        }
+
+        if (activeChain && !activeWalletClient) {
+          activeWalletClient = createWalletClient({
+            account: resolvedAddress,
+            chain: activeChain,
+            transport: custom(provider),
+          }) as WalletClient;
+        }
+      }
+
+      if (!resolvedAddress || !activeWalletClient || !activePublicClient || !activeChain) {
+        setError('Wallet not connected');
         return null;
       }
 
@@ -56,8 +109,8 @@ export function useEVVMDeployment() {
         evvmName: config.evvmName,
         principalTokenName: config.principalTokenName,
         principalTokenSymbol: config.principalTokenSymbol,
-        hostChainId: baseSepolia.id,
-        hostChainName: getChainName(baseSepolia.id),
+        hostChainId: activeChain.id,
+        hostChainName: getChainName(activeChain.id),
         adminAddress: config.adminAddress,
         goldenFisherAddress: config.goldenFisherAddress,
         activatorAddress: config.activatorAddress,
@@ -72,10 +125,10 @@ export function useEVVMDeployment() {
       saveDeployment(record);
 
       try {
-        const addresses: ContractAddresses = await deployEVVMContractsViaKernel(
-          kernelBundleBase,
-          kernelBundleSepolia,
+        const addresses: ContractAddresses = await deployEVVMContracts(
           config,
+          activeWalletClient as any,
+          activePublicClient as any,
           (p) => {
             setProgress(p);
             record.currentStep = p.step;
@@ -101,20 +154,19 @@ export function useEVVMDeployment() {
 
         setProgress({
           stage: 'complete',
-          message: 'Deployment complete (ZeroDev sponsored)!',
+          message: 'Deployment complete!',
           step: 7,
           totalSteps: 7,
         });
 
         return record;
-      } catch (err: unknown) {
+      } catch (err: any) {
         record.deploymentStatus = 'failed';
         saveDeployment(record);
-        const msg = err instanceof Error ? err.message : 'Deployment failed';
-        setError(msg);
+        setError(err?.message || 'Deployment failed');
         setProgress({
           stage: 'failed',
-          message: msg,
+          message: err?.message || 'Deployment failed',
           step: record.currentStep,
           totalSteps: 7,
         });
@@ -123,17 +175,8 @@ export function useEVVMDeployment() {
         setDeploying(false);
       }
     },
-    [kernelBundleBase, kernelBundleSepolia, kernelError, kernelSepoliaError]
+    [walletClient, chain?.id, publicClient, embeddedWallet, resolvedAddress]
   );
 
-  return {
-    deploying,
-    progress,
-    error,
-    canDeploy,
-    deploy,
-    kernelDeployReady,
-    kernelSepoliaError,
-    kernelError,
-  };
+  return { deploying, progress, error, canDeploy, deploy };
 }

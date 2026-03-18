@@ -28,8 +28,8 @@ const features = [
 ];
 
 export default function Index() {
+  const { login, authenticated } = usePrivy();
   const { isConnected } = useAccount();
-  const { login } = usePrivy();
   const navigate = useNavigate();
 
   return (
@@ -57,12 +57,10 @@ export default function Index() {
           and manage your virtual blockchain — all from your browser.
         </p>
 
-        {!isConnected ? (
-          <div className="flex justify-center">
-            <Button onClick={() => login()} className="h-10 px-6 gap-2">
-              Log in to continue
-            </Button>
-          </div>
+        {!authenticated ? (
+          <Button onClick={login} className="h-10 px-6 glow-primary">
+            Login
+          </Button>
         ) : (
           <Button
             onClick={() => navigate('/deploy')}
@@ -113,7 +111,7 @@ export default function Index() {
           <span className="h-3 w-px bg-border" />
           <span>EIP-191</span>
           <span className="h-3 w-px bg-border" />
-          <span>Privy · ZeroDev · wagmi</span>
+          <span>wagmi + viem</span>
         </div>
       </motion.div>
     </main>

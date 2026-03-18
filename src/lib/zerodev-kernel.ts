@@ -2,21 +2,21 @@ import {
   createKernelAccount,
   createKernelAccountClient,
   createZeroDevPaymasterClient,
-} from '@zerodev/sdk';
-import { getEntryPoint, KERNEL_V3_1 } from '@zerodev/sdk/constants';
-import { signerToEcdsaValidator } from '@zerodev/ecdsa-validator';
-import { createPublicClient, http, type Chain, type EIP1193Provider } from 'viem';
+} from "@zerodev/sdk";
+import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
+import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
+import { createPublicClient, http, type Chain, type EIP1193Provider } from "viem";
 
 export type KernelClientBundle = Awaited<ReturnType<typeof createKernelClientsForChain>>;
 
 /**
- * Build a Kernel smart account + sponsored client using Privy's EIP-1193 provider as owner.
+ * Build a Kernel smart account + client using Privy's EIP-1193 provider.
  */
 export async function createKernelClientsForChain(
   signer: EIP1193Provider,
   chain: Chain,
   bundlerRpc: string,
-  paymasterRpc: string
+  paymasterRpc: string,
 ) {
   const rpcUrl = chain.rpcUrls.default.http[0];
   const publicClient = createPublicClient({
@@ -24,18 +24,16 @@ export async function createKernelClientsForChain(
     transport: http(rpcUrl),
   });
 
-  const entryPoint = getEntryPoint('0.7');
+  const entryPoint = getEntryPoint("0.7");
 
-  const ecdsaValidator = await signerToEcdsaValidator(publicClient, {
-    signer,
+  const ecdsaValidator = await signerToEcdsaValidator(publicClient as any, {
+    signer: signer as any,
     entryPoint,
     kernelVersion: KERNEL_V3_1,
   });
 
-  const account = await createKernelAccount(publicClient, {
-    plugins: {
-      sudo: ecdsaValidator,
-    },
+  const account = await createKernelAccount(publicClient as any, {
+    plugins: { sudo: ecdsaValidator },
     entryPoint,
     kernelVersion: KERNEL_V3_1,
   });
@@ -49,9 +47,9 @@ export async function createKernelClientsForChain(
     account,
     chain,
     bundlerTransport: http(bundlerRpc),
-    client: publicClient,
+    client: publicClient as any,
     paymaster: {
-      getPaymasterData: (userOperation) =>
+      getPaymasterData: (userOperation: any) =>
         paymasterClient.sponsorUserOperation({ userOperation }),
     },
   });
@@ -60,8 +58,7 @@ export async function createKernelClientsForChain(
 }
 
 /**
- * ZeroDev v3 unified RPC (bundler + paymaster on one URL).
- * @see https://dashboard.zerodev.app/ → Project → Chains
+ * Default v3 unified RPC: https://rpc.zerodev.app/api/v3/{projectId}/chain/{chainId}
  */
 export function defaultZeroDevChainRpc(projectId: string, chainId: number): string {
   return `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chainId}`;
