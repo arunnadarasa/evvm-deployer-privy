@@ -262,11 +262,11 @@ export default function Signatures() {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <PenTool className="h-8 w-8 text-primary mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Connect Wallet to Sign</h1>
+        <h1 className="text-xl font-bold mb-2">Login to Sign</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Connect your wallet to generate EIP-191 signatures for EVVM operations.
+          Login to generate EIP-191 signatures for EVVM operations.
         </p>
-        <Button onClick={login} className="glow-primary">Connect Wallet</Button>
+        <Button onClick={login} className="glow-primary">Login</Button>
       </main>
     );
   }
