@@ -57,13 +57,13 @@ export default function Deploy() {
   };
 
   const handleDeploy = async () => {
-    if (!address) return;
+    if (!resolvedAddress) return;
     setPhase('deploy');
 
     const result = await deploy({
-      adminAddress: (adminAddr || address) as `0x${string}`,
-      goldenFisherAddress: (goldenFisher || address) as `0x${string}`,
-      activatorAddress: (activator || address) as `0x${string}`,
+      adminAddress: (adminAddr || resolvedAddress) as `0x${string}`,
+      goldenFisherAddress: (goldenFisher || resolvedAddress) as `0x${string}`,
+      activatorAddress: (activator || resolvedAddress) as `0x${string}`,
       evvmName,
       principalTokenName: tokenName,
       principalTokenSymbol: tokenSymbol,
