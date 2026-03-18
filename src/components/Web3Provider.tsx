@@ -6,7 +6,8 @@ import { baseSepolia, sepolia } from 'wagmi/chains';
 
 const queryClient = new QueryClient();
 
-const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'clxva58fj00k5czl3gzmqhwdq';
+const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'cmmv0z6dv06bs0djs07c7vrl3';
+const ZERODEV_PROJECT_ID = import.meta.env.VITE_ZERODEV_PROJECT_ID || '92691254-2986-488c-9c5d-b6028a3deb3a';
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   return (
