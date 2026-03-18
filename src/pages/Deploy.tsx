@@ -29,6 +29,7 @@ type Phase = 'configure' | 'deploy' | 'complete';
 
 export default function Deploy() {
   const { address, isConnected, chain } = useAccount();
+  const { login, authenticated } = usePrivy();
   const { deploying, progress, error, deploy } = useEVVMDeployment();
   const [phase, setPhase] = useState<Phase>('configure');
   const [completedDeployment, setCompletedDeployment] = useState<DeploymentRecord | null>(null);
@@ -84,9 +85,7 @@ export default function Deploy() {
     return 'pending';
   };
 
-  const { login } = usePrivy();
-
-  if (!isConnected) {
+  if (!authenticated) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <Rocket className="h-8 w-8 text-primary mx-auto mb-4" />
