@@ -1,17 +1,20 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'wagmi';
+import { createConfig } from '@privy-io/wagmi';
 import { baseSepolia, sepolia } from 'wagmi/chains';
 
-export const config = getDefaultConfig({
-  appName: 'EVVM Ichiban Deployer',
-  projectId: 'b3d3e8a1c7f04e9b8d2a5c6e7f8a9b0c', // Replace with your Reown project ID from https://cloud.reown.com
+export const config = createConfig({
   chains: [baseSepolia, sepolia],
-  ssr: false,
   transports: {
     [baseSepolia.id]: http(),
     [sepolia.id]: http(),
   },
 });
+
+declare module 'wagmi' {
+  interface Register {
+    config: typeof config;
+  }
+}
 
 export const SUPPORTED_CHAINS = {
   BASE_SEPOLIA: baseSepolia,

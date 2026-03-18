@@ -1,4 +1,4 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { PrivyWalletButton } from '@/components/PrivyWalletButton';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Hexagon, Rocket, PenTool, LayoutDashboard } from 'lucide-react';
@@ -39,11 +39,7 @@ export function Navbar() {
             ))}
           </nav>
         </div>
-        <ConnectButton
-          chainStatus="icon"
-          accountStatus="address"
-          showBalance={false}
-        />
+        <PrivyWalletButton />
       </div>
     </header>
   );

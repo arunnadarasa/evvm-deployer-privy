@@ -1,5 +1,17 @@
-import { type WalletClient, type PublicClient, type Hash, type Address, createPublicClient, http } from 'viem';
+import {
+  type WalletClient,
+  type PublicClient,
+  type Hash,
+  type Address,
+  createPublicClient,
+  http,
+} from 'viem';
 import { baseSepolia, sepolia } from 'wagmi/chains';
+import type { KernelClientBundle } from '@/lib/zerodev-kernel';
+import {
+  deployContractViaKernel,
+  snapshotKernelChildAddresses,
+} from '@/lib/deploy-via-kernel';
 import {
   StakingABI,
   NameServiceABI,
@@ -346,6 +358,236 @@ export async function deployEVVMContracts(
   await walletClient.switchChain?.({ id: baseSepolia.id });
 
   onProgress({ stage: 'deployment-complete', message: 'All contracts deployed and registered!', step: 7, totalSteps });
+
+  return addresses;
+}
+
+async function deployViaKernelWithRetry(
+  bundle: KernelClientBundle,
+  params: { abi: readonly unknown[]; bytecode: `0x${string}`; args?: readonly unknown[] },
+  deployedChildren: Set<string>,
+  maxRetries = 3
+): Promise<{ address: Address; txHash: Hash }> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await deployContractViaKernel(bundle, params, deployedChildren);
+    } catch (error) {
+      if (attempt >= maxRetries) throw error;
+      await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 1000));
+    }
+  }
+  throw new Error('Kernel deployment failed after retries');
+}
+
+/**
+ * Full EVVM deploy + registry using ZeroDev Kernel (sponsored UserOps) on Base Sepolia + Sepolia.
+ */
+export async function deployEVVMContractsViaKernel(
+  baseBundle: KernelClientBundle,
+  sepoliaBundle: KernelClientBundle,
+  config: DeploymentConfig,
+  onProgress: (progress: DeploymentProgress) => void
+): Promise<ContractAddresses> {
+  const addresses: ContractAddresses = {};
+  const totalSteps = 7;
+  const hostChainId = baseSepolia.id;
+  const deployedChildren = await snapshotKernelChildAddresses(
+    baseBundle.publicClient,
+    baseBundle.account.address
+  );
+
+  onProgress({ stage: 'deploying-staking', message: 'Deploying Staking (sponsored UserOp)...', step: 1, totalSteps });
+  const staking = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: StakingABI,
+      bytecode: STAKING_BYTECODE,
+      args: [config.adminAddress, config.goldenFisherAddress],
+    },
+    deployedChildren
+  );
+  addresses.staking = staking.address;
+  onProgress({
+    stage: 'deploying-staking',
+    message: 'Staking deployed',
+    txHash: staking.txHash,
+    step: 1,
+    totalSteps,
+  });
+
+  onProgress({ stage: 'deploying-core', message: 'Deploying CoreHashUtils (sponsored)...', step: 2, totalSteps });
+  const coreHashUtilsRefs =
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((EVVM_CORE_LINK_REFERENCES as any)?.['src/library/utils/signature/CoreHashUtils.sol']?.CoreHashUtils as
+      | Array<{ start: number; length: number }>
+      | undefined) ?? [];
+
+  if (coreHashUtilsRefs.length === 0) {
+    throw new Error('Missing CoreHashUtils link references for Core bytecode');
+  }
+
+  const coreHashUtils = await deployViaKernelWithRetry(
+    baseBundle,
+    { abi: [], bytecode: CORE_HASH_UTILS_BYTECODE, args: [] },
+    deployedChildren
+  );
+
+  const linkedCoreBytecode = linkBytecode(EVVM_CORE_BYTECODE, coreHashUtils.address, coreHashUtilsRefs);
+
+  const evvmMetadata = {
+    EvvmName: config.evvmName,
+    EvvmID: 0n,
+    principalTokenName: config.principalTokenName,
+    principalTokenSymbol: config.principalTokenSymbol,
+    principalTokenAddress: '0x0000000000000000000000000000000000000000' as Address,
+    totalSupply: config.totalSupply,
+    eraTokens: config.eraTokens,
+    reward: config.rewardPerOperation,
+  } as const;
+
+  onProgress({ stage: 'deploying-core', message: 'Deploying EVVM Core (sponsored)...', step: 2, totalSteps });
+  const core = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: CoreABI,
+      bytecode: linkedCoreBytecode,
+      args: [config.adminAddress, addresses.staking, evvmMetadata],
+    },
+    deployedChildren
+  );
+  addresses.evvmCore = core.address;
+  onProgress({
+    stage: 'deploying-core',
+    message: 'EVVM Core deployed',
+    txHash: core.txHash,
+    step: 2,
+    totalSteps,
+  });
+
+  onProgress({ stage: 'deploying-nameservice', message: 'Deploying NameService (sponsored)...', step: 3, totalSteps });
+  const nameService = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: NameServiceABI,
+      bytecode: NAME_SERVICE_BYTECODE,
+      args: [addresses.evvmCore, config.adminAddress],
+    },
+    deployedChildren
+  );
+  addresses.nameService = nameService.address;
+  onProgress({
+    stage: 'deploying-nameservice',
+    message: 'NameService deployed',
+    txHash: nameService.txHash,
+    step: 3,
+    totalSteps,
+  });
+
+  onProgress({ stage: 'deploying-estimator', message: 'Deploying Estimator (sponsored)...', step: 4, totalSteps });
+  const estimator = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: EstimatorABI,
+      bytecode: ESTIMATOR_BYTECODE,
+      args: [config.activatorAddress, addresses.evvmCore, addresses.staking, config.adminAddress],
+    },
+    deployedChildren
+  );
+  addresses.estimator = estimator.address;
+  onProgress({
+    stage: 'deploying-estimator',
+    message: 'Estimator deployed',
+    txHash: estimator.txHash,
+    step: 4,
+    totalSteps,
+  });
+
+  onProgress({ stage: 'deploying-treasury', message: 'Deploying Treasury (sponsored)...', step: 5, totalSteps });
+  const treasury = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: TreasuryABI,
+      bytecode: TREASURY_BYTECODE,
+      args: [addresses.evvmCore],
+    },
+    deployedChildren
+  );
+  addresses.treasury = treasury.address;
+  onProgress({
+    stage: 'deploying-treasury',
+    message: 'Treasury deployed',
+    txHash: treasury.txHash,
+    step: 5,
+    totalSteps,
+  });
+
+  onProgress({ stage: 'deploying-p2pswap', message: 'Deploying P2PSwap (sponsored)...', step: 6, totalSteps });
+  const p2pSwap = await deployViaKernelWithRetry(
+    baseBundle,
+    {
+      abi: P2PSwapABI,
+      bytecode: P2P_SWAP_BYTECODE,
+      args: [addresses.evvmCore, addresses.staking, config.adminAddress],
+    },
+    deployedChildren
+  );
+  addresses.p2pSwap = p2pSwap.address;
+  onProgress({
+    stage: 'deploying-p2pswap',
+    message: 'P2PSwap deployed',
+    txHash: p2pSwap.txHash,
+    step: 6,
+    totalSteps,
+  });
+
+  onProgress({
+    stage: 'switching-to-sepolia',
+    message: 'Registering on Ethereum Sepolia via Kernel (sponsored)...',
+    step: 7,
+    totalSteps,
+  });
+
+  const sim = await sepoliaBundle.publicClient.simulateContract({
+    address: REGISTRY_EVM_SEPOLIA_ADDRESS,
+    abi: RegistryEvvmABI,
+    functionName: 'registerEvvm',
+    args: [BigInt(hostChainId), addresses.evvmCore!],
+    account: sepoliaBundle.account.address,
+  });
+
+  addresses.evvmId = sim.result;
+
+  onProgress({ stage: 'registering', message: 'Submitting registry UserOp on Sepolia...', step: 7, totalSteps });
+
+  const regTxHash = await sepoliaBundle.kernelClient.writeContract({
+    address: REGISTRY_EVM_SEPOLIA_ADDRESS,
+    abi: RegistryEvvmABI,
+    functionName: 'registerEvvm',
+    args: [BigInt(hostChainId), addresses.evvmCore!],
+  });
+
+  const regReceipt = await sepoliaBundle.publicClient.waitForTransactionReceipt({
+    hash: regTxHash,
+    timeout: 180_000,
+  });
+  if (regReceipt.status === 'reverted') {
+    throw new Error('Registry registration UserOp reverted');
+  }
+
+  onProgress({
+    stage: 'registering',
+    message: `EVVM registered (ID: ${addresses.evvmId.toString()})`,
+    txHash: regTxHash,
+    step: 7,
+    totalSteps,
+  });
+
+  onProgress({
+    stage: 'deployment-complete',
+    message: 'All contracts deployed via ZeroDev and registered!',
+    step: 7,
+    totalSteps,
+  });
 
   return addresses;
 }

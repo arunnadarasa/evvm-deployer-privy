@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { useAccount } from 'wagmi';
 import {
-  deployEVVMContracts,
+  deployEVVMContractsViaKernel,
   type DeploymentConfig,
   type DeploymentProgress,
   type ContractAddresses,
@@ -13,21 +13,36 @@ import {
   type DeploymentRecord,
 } from '@/lib/storage';
 import { getChainName } from '@/lib/wagmi';
+import { useZeroDevKernel } from '@/contexts/ZeroDevKernelContext';
+import { baseSepolia } from 'wagmi/chains';
 
 export function useEVVMDeployment() {
   const [deploying, setDeploying] = useState(false);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { address, chain } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
+  const { address, isConnected } = useAccount();
+  const {
+    kernelBundleBase,
+    kernelBundleSepolia,
+    kernelDeployReady,
+    kernelError,
+    kernelSepoliaError,
+  } = useZeroDevKernel();
 
-  const canDeploy = !!address && !!walletClient && !!publicClient && hasBytecodes();
+  const canDeploy =
+    !!isConnected &&
+    !!address &&
+    kernelDeployReady &&
+    hasBytecodes();
 
   const deploy = useCallback(
     async (config: DeploymentConfig): Promise<DeploymentRecord | null> => {
-      if (!walletClient || !publicClient || !chain) {
-        setError('Wallet not connected');
+      if (!kernelBundleBase || !kernelBundleSepolia) {
+        setError(
+          kernelSepoliaError ??
+            kernelError ??
+            'ZeroDev Kernel not ready on Base Sepolia and Ethereum Sepolia.'
+        );
         return null;
       }
 
@@ -41,8 +56,8 @@ export function useEVVMDeployment() {
         evvmName: config.evvmName,
         principalTokenName: config.principalTokenName,
         principalTokenSymbol: config.principalTokenSymbol,
-        hostChainId: chain.id,
-        hostChainName: getChainName(chain.id),
+        hostChainId: baseSepolia.id,
+        hostChainName: getChainName(baseSepolia.id),
         adminAddress: config.adminAddress,
         goldenFisherAddress: config.goldenFisherAddress,
         activatorAddress: config.activatorAddress,
@@ -57,10 +72,10 @@ export function useEVVMDeployment() {
       saveDeployment(record);
 
       try {
-        const addresses: ContractAddresses = await deployEVVMContracts(
+        const addresses: ContractAddresses = await deployEVVMContractsViaKernel(
+          kernelBundleBase,
+          kernelBundleSepolia,
           config,
-          walletClient,
-          publicClient,
           (p) => {
             setProgress(p);
             record.currentStep = p.step;
@@ -86,19 +101,20 @@ export function useEVVMDeployment() {
 
         setProgress({
           stage: 'complete',
-          message: 'Deployment complete!',
+          message: 'Deployment complete (ZeroDev sponsored)!',
           step: 7,
           totalSteps: 7,
         });
 
         return record;
-      } catch (err: any) {
+      } catch (err: unknown) {
         record.deploymentStatus = 'failed';
         saveDeployment(record);
-        setError(err?.message || 'Deployment failed');
+        const msg = err instanceof Error ? err.message : 'Deployment failed';
+        setError(msg);
         setProgress({
           stage: 'failed',
-          message: err?.message || 'Deployment failed',
+          message: msg,
           step: record.currentStep,
           totalSteps: 7,
         });
@@ -107,8 +123,17 @@ export function useEVVMDeployment() {
         setDeploying(false);
       }
     },
-    [walletClient, publicClient, chain]
+    [kernelBundleBase, kernelBundleSepolia, kernelError, kernelSepoliaError]
   );
 
-  return { deploying, progress, error, canDeploy, deploy };
+  return {
+    deploying,
+    progress,
+    error,
+    canDeploy,
+    deploy,
+    kernelDeployReady,
+    kernelSepoliaError,
+    kernelError,
+  };
 }

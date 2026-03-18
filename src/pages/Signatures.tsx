@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { usePrivy } from '@privy-io/react-auth';
 import { motion } from 'framer-motion';
 import {
   buildMessageSignedForPay,
@@ -43,6 +43,7 @@ function generateRandomNonce(): string {
 }
 
 export default function Signatures() {
+  const { login } = usePrivy();
   const { isConnected } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -260,11 +261,11 @@ export default function Signatures() {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <PenTool className="h-8 w-8 text-primary mx-auto mb-4" />
-        <h1 className="text-xl font-bold mb-2">Connect Wallet to Sign</h1>
+        <h1 className="text-xl font-bold mb-2">Log in to Sign</h1>
         <p className="text-sm text-muted-foreground mb-6">
-          Connect your wallet to generate EIP-191 signatures for EVVM operations.
+          Sign in with Privy to generate EIP-191 signatures for EVVM operations.
         </p>
-        <ConnectButton />
+        <Button onClick={() => login()}>Log in</Button>
       </main>
     );
   }
