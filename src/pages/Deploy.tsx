@@ -54,9 +54,11 @@ export default function Deploy() {
   // Auto-fill connected address
   const fillAddress = () => {
     if (resolvedAddress) {
-      if (!adminAddr) setAdminAddr(resolvedAddress);
-      if (!goldenFisher) setGoldenFisher(resolvedAddress);
-      if (!activator) setActivator(resolvedAddress);
+      setAdminAddr(resolvedAddress);
+      setGoldenFisher(resolvedAddress);
+      setActivator(resolvedAddress);
+    } else {
+      toast({ title: 'Wallet not ready', description: 'Your wallet is still loading. Please try again in a moment.', variant: 'destructive' });
     }
   };
 
