@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { createPublicClient, createWalletClient, custom, http, type Chain } from 'viem';
+import { baseSepolia, sepolia } from 'wagmi/chains';
 import {
   deployEVVMContracts,
   type DeploymentConfig,
@@ -14,6 +17,16 @@ import {
 } from '@/lib/storage';
 import { getChainName } from '@/lib/wagmi';
 
+const SUPPORTED_DEPLOY_CHAINS: Record<number, Chain> = {
+  [baseSepolia.id]: baseSepolia,
+  [sepolia.id]: sepolia,
+};
+
+const resolveSupportedChain = (chainId?: number | null): Chain | null => {
+  if (!chainId) return null;
+  return SUPPORTED_DEPLOY_CHAINS[chainId] ?? null;
+};
+
 export function useEVVMDeployment() {
   const [deploying, setDeploying] = useState(false);
   const [progress, setProgress] = useState<DeploymentProgress | null>(null);
@@ -21,12 +34,59 @@ export function useEVVMDeployment() {
   const { address, chain } = useAccount();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
+  const { user } = usePrivy();
+  const { wallets } = useWallets();
 
-  const canDeploy = !!address && !!walletClient && !!publicClient && hasBytecodes();
+  const embeddedWallet = wallets.find((wallet) => wallet.walletClientType === 'privy');
+  const resolvedAddress =
+    address ??
+    (embeddedWallet?.address as `0x${string}` | undefined) ??
+    (user?.wallet?.address as `0x${string}` | undefined);
+
+  const canDeploy = !!resolvedAddress && hasBytecodes();
 
   const deploy = useCallback(
     async (config: DeploymentConfig): Promise<DeploymentRecord | null> => {
-      if (!walletClient || !publicClient || !chain) {
+      let activeWalletClient = walletClient;
+      let activeChain = resolveSupportedChain(chain?.id ?? walletClient?.chain?.id ?? publicClient?.chain?.id);
+      let activePublicClient =
+        publicClient ??
+        (activeChain
+          ? createPublicClient({
+              chain: activeChain,
+              transport: http(activeChain.rpcUrls.default.http[0]),
+            })
+          : undefined);
+
+      if ((!activeWalletClient || !activeChain) && embeddedWallet && resolvedAddress) {
+        const provider = await embeddedWallet.getEthereumProvider();
+
+        if (!activeChain) {
+          const providerChainId = await provider.request({ method: 'eth_chainId' });
+          const parsedChainId =
+            typeof providerChainId === 'string'
+              ? Number.parseInt(providerChainId, 16)
+              : Number(providerChainId);
+          activeChain = resolveSupportedChain(parsedChainId);
+        }
+
+        if (activeChain && !activePublicClient) {
+          activePublicClient = createPublicClient({
+            chain: activeChain,
+            transport: http(activeChain.rpcUrls.default.http[0]),
+          });
+        }
+
+        if (activeChain && !activeWalletClient) {
+          activeWalletClient = createWalletClient({
+            account: resolvedAddress,
+            chain: activeChain,
+            transport: custom(provider),
+          });
+        }
+      }
+
+      if (!resolvedAddress || !activeWalletClient || !activePublicClient || !activeChain) {
         setError('Wallet not connected');
         return null;
       }
@@ -41,8 +101,8 @@ export function useEVVMDeployment() {
         evvmName: config.evvmName,
         principalTokenName: config.principalTokenName,
         principalTokenSymbol: config.principalTokenSymbol,
-        hostChainId: chain.id,
-        hostChainName: getChainName(chain.id),
+        hostChainId: activeChain.id,
+        hostChainName: getChainName(activeChain.id),
         adminAddress: config.adminAddress,
         goldenFisherAddress: config.goldenFisherAddress,
         activatorAddress: config.activatorAddress,
@@ -59,8 +119,8 @@ export function useEVVMDeployment() {
       try {
         const addresses: ContractAddresses = await deployEVVMContracts(
           config,
-          walletClient as any,
-          publicClient as any,
+          activeWalletClient as any,
+          activePublicClient as any,
           (p) => {
             setProgress(p);
             record.currentStep = p.step;
@@ -107,7 +167,7 @@ export function useEVVMDeployment() {
         setDeploying(false);
       }
     },
-    [walletClient, publicClient, chain]
+    [walletClient, chain?.id, publicClient, embeddedWallet, resolvedAddress]
   );
 
   return { deploying, progress, error, canDeploy, deploy };
