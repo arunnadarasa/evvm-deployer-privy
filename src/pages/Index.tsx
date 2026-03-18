@@ -1,7 +1,6 @@
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Hexagon, Rocket, PenTool, LayoutDashboard, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,6 +28,7 @@ const features = [
 ];
 
 export default function Index() {
+  const { login, authenticated } = usePrivy();
   const { isConnected } = useAccount();
   const navigate = useNavigate();
 
@@ -57,10 +57,10 @@ export default function Index() {
           and manage your virtual blockchain — all from your browser.
         </p>
 
-        {!isConnected ? (
-          <div className="flex justify-center">
-            <ConnectButton />
-          </div>
+        {!authenticated ? (
+          <Button onClick={login} className="h-10 px-6 glow-primary">
+            Connect Wallet
+          </Button>
         ) : (
           <Button
             onClick={() => navigate('/deploy')}

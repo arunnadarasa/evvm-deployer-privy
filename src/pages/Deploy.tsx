@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { usePrivy } from '@privy-io/react-auth';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +84,8 @@ export default function Deploy() {
     return 'pending';
   };
 
+  const { login } = usePrivy();
+
   if (!isConnected) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
@@ -92,7 +94,7 @@ export default function Deploy() {
         <p className="text-sm text-muted-foreground mb-6">
           Connect your wallet to deploy EVVM contracts on Base Sepolia.
         </p>
-        <ConnectButton />
+        <Button onClick={login} className="glow-primary">Connect Wallet</Button>
       </main>
     );
   }

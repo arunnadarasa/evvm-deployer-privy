@@ -1,31 +1,36 @@
-import '@rainbow-me/rainbowkit/styles.css';
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
+import { PrivyProvider } from '@privy-io/react-auth';
+import { WagmiProvider } from '@privy-io/wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { config } from '@/lib/wagmi';
+import { baseSepolia, sepolia } from 'wagmi/chains';
 
 const queryClient = new QueryClient();
 
-const evvmTheme = darkTheme({
-  accentColor: 'hsl(221, 100%, 50%)',
-  accentColorForeground: 'white',
-  borderRadius: 'small',
-  fontStack: 'system',
-});
-
-// Override specific theme values
-evvmTheme.colors.connectButtonBackground = 'hsl(240, 20%, 8%)';
-evvmTheme.colors.modalBackground = 'hsl(240, 20%, 6%)';
-evvmTheme.colors.modalBorder = 'hsl(240, 22%, 15%)';
+const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'cmmv0z6dv06bs0djs07c7vrl3';
+const ZERODEV_PROJECT_ID = import.meta.env.VITE_ZERODEV_PROJECT_ID || '92691254-2986-488c-9c5d-b6028a3deb3a';
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   return (
-    <WagmiProvider config={config}>
+    <PrivyProvider
+      appId={PRIVY_APP_ID}
+      config={{
+        appearance: {
+          theme: 'dark',
+          accentColor: '#0047FF',
+        },
+        loginMethods: ['email', 'google', 'discord', 'wallet'],
+        embeddedWallets: {
+          createOnLogin: 'users-without-wallets',
+        },
+        defaultChain: baseSepolia,
+        supportedChains: [baseSepolia, sepolia],
+      }}
+    >
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={evvmTheme} modalSize="compact">
+        <WagmiProvider config={config}>
           {children}
-        </RainbowKitProvider>
+        </WagmiProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </PrivyProvider>
   );
 }
