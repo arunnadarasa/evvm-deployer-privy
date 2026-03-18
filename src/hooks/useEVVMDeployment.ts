@@ -90,7 +90,7 @@ export function useEVVMDeployment() {
             account: resolvedAddress,
             chain: activeChain,
             transport: custom(provider),
-          });
+          }) as WalletClient;
         }
       }
 
