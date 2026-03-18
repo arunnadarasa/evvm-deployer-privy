@@ -59,7 +59,7 @@ export function Navbar() {
           </div>
         ) : (
           <Button size="sm" className="h-8 text-xs" onClick={login}>
-            Connect Wallet
+            Login
           </Button>
         )}
       </div>

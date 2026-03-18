@@ -59,7 +59,7 @@ export default function Index() {
 
         {!authenticated ? (
           <Button onClick={login} className="h-10 px-6 glow-primary">
-            Connect Wallet
+            Login
           </Button>
         ) : (
           <Button
