@@ -193,7 +193,7 @@ export default function Deploy() {
                       <Input
                         value={goldenFisher}
                         onChange={(e) => setGoldenFisher(e.target.value)}
-                        placeholder={address}
+                        placeholder={resolvedAddress}
                         className="mt-0.5 h-8 text-xs font-mono"
                       />
                     </div>
