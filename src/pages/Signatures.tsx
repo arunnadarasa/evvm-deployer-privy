@@ -256,9 +256,9 @@ export default function Signatures() {
     setSigning(false);
   };
 
-  const { login } = usePrivy();
+  const { login, authenticated } = usePrivy();
 
-  if (!isConnected) {
+  if (!authenticated) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
         <PenTool className="h-8 w-8 text-primary mx-auto mb-4" />
