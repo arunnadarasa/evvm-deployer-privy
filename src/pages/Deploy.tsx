@@ -38,7 +38,10 @@ export default function Deploy() {
   const bytesReady = hasBytecodes();
 
   // Resolve address: prefer wagmi, fall back to Privy embedded wallet
-  const resolvedAddress = address ?? wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined;
+  const resolvedAddress =
+    address ??
+    (wallets.find(w => w.walletClientType === 'privy')?.address as `0x${string}` | undefined) ??
+    (user?.wallet?.address as `0x${string}` | undefined);
 
   // Form state
   const [evvmName, setEvvmName] = useState('');
