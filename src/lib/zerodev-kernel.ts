@@ -1,0 +1,65 @@
+import {
+  createKernelAccount,
+  createKernelAccountClient,
+  createZeroDevPaymasterClient,
+} from "@zerodev/sdk";
+import { getEntryPoint, KERNEL_V3_1 } from "@zerodev/sdk/constants";
+import { signerToEcdsaValidator } from "@zerodev/ecdsa-validator";
+import { createPublicClient, http, type Chain, type EIP1193Provider } from "viem";
+
+export type KernelClientBundle = Awaited<ReturnType<typeof createKernelClientsForChain>>;
+
+/**
+ * Build a Kernel smart account + client using Privy's EIP-1193 provider.
+ */
+export async function createKernelClientsForChain(
+  signer: EIP1193Provider,
+  chain: Chain,
+  bundlerRpc: string,
+  paymasterRpc: string,
+) {
+  const rpcUrl = chain.rpcUrls.default.http[0];
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  });
+
+  const entryPoint = getEntryPoint("0.7");
+
+  const ecdsaValidator = await signerToEcdsaValidator(publicClient as any, {
+    signer: signer as any,
+    entryPoint,
+    kernelVersion: KERNEL_V3_1,
+  });
+
+  const account = await createKernelAccount(publicClient as any, {
+    plugins: { sudo: ecdsaValidator },
+    entryPoint,
+    kernelVersion: KERNEL_V3_1,
+  });
+
+  const paymasterClient = createZeroDevPaymasterClient({
+    chain,
+    transport: http(paymasterRpc),
+  });
+
+  const kernelClient = createKernelAccountClient({
+    account,
+    chain,
+    bundlerTransport: http(bundlerRpc),
+    client: publicClient as any,
+    paymaster: {
+      getPaymasterData: (userOperation: any) =>
+        paymasterClient.sponsorUserOperation({ userOperation }),
+    },
+  });
+
+  return { kernelClient, account, publicClient };
+}
+
+/**
+ * Default v3 unified RPC: https://rpc.zerodev.app/api/v3/{projectId}/chain/{chainId}
+ */
+export function defaultZeroDevChainRpc(projectId: string, chainId: number): string {
+  return `https://rpc.zerodev.app/api/v3/${projectId}/chain/${chainId}`;
+}

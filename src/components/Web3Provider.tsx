@@ -1,34 +1,32 @@
-import { PrivyProvider } from '@privy-io/react-auth';
-import { WagmiProvider } from '@privy-io/wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { config } from '@/lib/wagmi';
-import { baseSepolia, sepolia } from 'wagmi/chains';
+import { PrivyProvider } from "@privy-io/react-auth";
+import { WagmiProvider } from "@privy-io/wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { baseSepolia, sepolia } from "wagmi/chains";
+import { config } from "@/lib/wagmi";
+import { ZeroDevKernelProvider } from "@/contexts/ZeroDevKernelContext";
+import { ActiveWalletSync } from "@/components/ActiveWalletSync";
 
 const queryClient = new QueryClient();
 
-const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'cmmv0z6dv06bs0djs07c7vrl3';
-const ZERODEV_PROJECT_ID = import.meta.env.VITE_ZERODEV_PROJECT_ID || '92691254-2986-488c-9c5d-b6028a3deb3a';
+const appId = import.meta.env.VITE_PRIVY_APP_ID ?? "cmmv0z6dv06bs0djs07c7vrl3";
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   return (
     <PrivyProvider
-      appId={PRIVY_APP_ID}
+      appId={appId}
       config={{
-        appearance: {
-          theme: 'dark',
-          accentColor: '#0047FF',
-        },
-        loginMethods: ['email', 'google', 'discord', 'wallet'],
-        embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-        },
-        defaultChain: baseSepolia,
         supportedChains: [baseSepolia, sepolia],
+        defaultChain: baseSepolia,
+        embeddedWallets: {
+          createOnLogin: "users-without-wallets",
+        },
+        loginMethods: ["email", "google", "wallet", "discord"],
       }}
     >
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={config}>
-          {children}
+          <ActiveWalletSync />
+          <ZeroDevKernelProvider>{children}</ZeroDevKernelProvider>
         </WagmiProvider>
       </QueryClientProvider>
     </PrivyProvider>
