@@ -29,6 +29,7 @@ type Phase = 'configure' | 'deploy' | 'complete';
 
 export default function Deploy() {
   const { address, isConnected, chain } = useAccount();
+  const { login, authenticated } = usePrivy();
   const { deploying, progress, error, deploy } = useEVVMDeployment();
   const [phase, setPhase] = useState<Phase>('configure');
   const [completedDeployment, setCompletedDeployment] = useState<DeploymentRecord | null>(null);
