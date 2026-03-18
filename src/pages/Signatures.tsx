@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useWalletClient } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { usePrivy } from '@privy-io/react-auth';
 import { motion } from 'framer-motion';
 import {
   buildMessageSignedForPay,
@@ -256,6 +256,8 @@ export default function Signatures() {
     setSigning(false);
   };
 
+  const { login } = usePrivy();
+
   if (!isConnected) {
     return (
       <main className="container max-w-lg px-4 py-16 text-center">
@@ -264,7 +266,7 @@ export default function Signatures() {
         <p className="text-sm text-muted-foreground mb-6">
           Connect your wallet to generate EIP-191 signatures for EVVM operations.
         </p>
-        <ConnectButton />
+        <Button onClick={login} className="glow-primary">Connect Wallet</Button>
       </main>
     );
   }
