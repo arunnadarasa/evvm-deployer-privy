@@ -15,23 +15,45 @@ Web app for deploying EVVM (Ethereum Virtual Machine) contracts, registering ins
 
 - **Frontend:** React 18, TypeScript, Vite 8
 - **UI:** Tailwind CSS, shadcn/ui (Radix), Framer Motion
-- **Web3:** wagmi, RainbowKit, viem
+- **Auth & EOA:** [Privy](https://privy.io) (email, Google, Discord, wallet) + `@privy-io/wagmi` (wagmi bindings)
+- **Account abstraction:** [ZeroDev](https://zerodev.app) Kernel on **Base Sepolia** and **Ethereum Sepolia** (gas-sponsored UserOps; the Privy embedded wallet is the ECDSA owner via `signerToEcdsaValidator`)
+- **Web3:** wagmi, viem, `permissionless` (pulled in by ZeroDev)
 - **EVVM:** `@evvm/viem-signature-library` for ABIs and signature utilities
+‑ **Polyfills:** `buffer` polyfill wired in `src/main.tsx` to provide a browser‑safe global `Buffer` for web3/auth dependencies that still expect the Node global
 
 ## Prerequisites
 
 - Node.js 18+
 - npm or bun
+- Privy app ID and (recommended) ZeroDev project with **Base Sepolia** enabled
 
 ## Getting started
 
 ```bash
-# Install dependencies
-npm install
+cp .env.example .env
+# Set VITE_PRIVY_APP_ID (required). Optionally set ZeroDev RPC overrides.
+
+npm install --legacy-peer-deps
 
 # Run development server (default: http://localhost:8080)
 npm run dev
 ```
+
+**Privy dashboard:** enable Base Sepolia and Ethereum Sepolia, and turn on **embedded Ethereum wallets**.  
+**ZeroDev dashboard:** enable both chains, and copy the project id shown there (defaults in this repo to `92691254-2986-488c-9c5d-b6028a3deb3a`).
+
+By default, the app uses **v3 unified RPCs**:
+
+- Base Sepolia: `https://rpc.zerodev.app/api/v3/<PROJECT_ID>/chain/84532`
+- Ethereum Sepolia: `https://rpc.zerodev.app/api/v3/<PROJECT_ID>/chain/11155111`
+
+You can override them with:
+
+- `VITE_ZERODEV_RPC` / `VITE_ZERODEV_RPC_SEPOLIA` (bundler URLs)
+- `VITE_ZERODEV_PAYMASTER_RPC` / `VITE_ZERODEV_PAYMASTER_RPC_SEPOLIA` (optional, defaults to the same URL as bundler)
+
+**Deploy** runs entirely via **ZeroDev Kernel**: six contract deploys on **Base Sepolia** plus **registry** on **Ethereum Sepolia** are **sponsored UserOps**. The Privy embedded wallet signs the UserOps; ZeroDev’s paymaster/bundler handle gas.  
+**Signatures** still use your Privy EOA via wagmi and do **not** go through account abstraction.
 
 ## Scripts
 
